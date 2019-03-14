@@ -12,13 +12,13 @@ default:
 	$(CC) $(CFLAGS) omp_solved5.c -o omp_solved5
 	$(CC) $(CAREFULCFLAGS) omp_solved6.c -o omp_solved6
 	$(CC) $(CFLAGS) jacobi2D-omp.c -o jacobi2D-omp
-	$(CC) $(CFLAGS) GS2D-omp.c -o GS2D-omp
+	$(CC) $(CFLAGS) gs2D-omp.c -o gs2D-omp
 
 jacobi:
 	$(CC) $(CFLAGS) jacobi2D-omp.c -o jacobi2D-omp
 
 GS:
-	$(CC) $(CFLAGS) GS2D-omp.c -o GS2D-omp
+	$(CC) $(CFLAGS) gs2D-omp.c -o gs2D-omp
 
 MMult:
 	$(CC) $(CFLAGS) MMult1.cpp -o MMult1
@@ -33,4 +33,4 @@ clean:
 	rm -f omp_solved5
 	rm -f omp_solved6
 	rm -f jacobi2D-omp
-	rm -f GS2D-omp
+	rm -f gs2D-omp
