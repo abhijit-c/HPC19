@@ -5,7 +5,7 @@
 #include <omp.h>
 #include "utils.h"
 
-#define BLOCK_SIZE 16
+#define BLOCK_SIZE 32
 
 // Note: matrices are stored in column major order; i.e. the array elements in
 // the (m x n) matrix C are stored in the sequence: {C_00, C_10, ..., C_m0,
@@ -26,13 +26,14 @@ void MMult0(long m, long n, long k, double *a, double *b, double *c) {
 
 void MMult1(long m, long n, long k, double *a, double *b, double *c) {
   // Index block
-  for (long ib = 0; ib < m; ib += BLOCK_SIZE) {
-    for (long jb = 0; jb < k; jb += BLOCK_SIZE) {
-      for (long pb = 0; pb < n; pb += BLOCK_SIZE) {
+  #pragma omp parallel for collapse(3)
+  for (long jb = 0; jb < k; jb += BLOCK_SIZE) {
+    for (long pb = 0; pb < n; pb += BLOCK_SIZE) {
+      for (long ib = 0; ib < m; ib += BLOCK_SIZE) {
         //Multiply block
         for (long j = jb; j < jb+BLOCK_SIZE; j++) {
-          for (long i = ib; i < ib+BLOCK_SIZE; i++) {
-            for (long p = pb; p < pb+BLOCK_SIZE; p++) {
+          for (long p = pb; p < pb+BLOCK_SIZE; p++) {
+            for (long i = ib; i < ib+BLOCK_SIZE; i++) {
               c[j*m + i] += a[p*m + i]*b[p + j*k];
             }
           }

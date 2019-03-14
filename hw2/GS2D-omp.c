@@ -48,7 +48,7 @@ double lresidual(int N, double *u, double *f)
     return sqrt(resid);
 }
 
-int jacobi(int N, double *u0, double *f, double *u)
+int GaussSeidel(int N, double *u0, double *f, double *u)
 {
     double init_res = lresidual(N, u0, f), res = init_res;
     double h = 1.0/(N+1);
@@ -59,14 +59,28 @@ int jacobi(int N, double *u0, double *f, double *u)
 
     while (res > init_res*TOL && it++ < NUM_ITER + 1)
     { //Run until desired tolerance, or until too long.
-        #pragma omp parallel for collapse(2)
-        for (int j = 1; j <= N; j++) 
-        { // From bottom row to top
-            for (int i = 1; i <= N; i++)
-            { // From left to right
-                utmp[i+j*(N+2)] = 0.25*(h*h*f[i+j*(N+2)] + 
-                                        u[(i-1)+j*(N+2)] + u[i+(j-1)*(N+2)] + 
-                                        u[(i+1)+j*(N+2)] + u[i+(j+1)*(N+2)]); 
+        #pragma omp parallel for
+        for (int j = 1; j <= N; j++)
+        { // Red point update
+            for (int i = 2 - (j&1); i <= N; i+=2)
+            {
+                utmp[i+j*(N+2)] = 0.25*(h*h*f[ i + j*(N+2) ] + 
+                                        utmp[ (i-1) + j*(N+2) ] + 
+                                        utmp[ i + (j-1)*(N+2) ] +
+                                        utmp[ (i+1) + j*(N+2) ] +
+                                        utmp[ i + (j+1)*(N+2) ]);
+            }
+        }
+        #pragma omp parallel for
+        for (int j = 1; j <= N; j++)
+        { // Black point update
+            for (int i = 1 + (j&1); i <= N; i+=2)
+            {
+                utmp[i+j*(N+2)] = 0.25*(h*h*f[ i + j*(N+2) ] + 
+                                        utmp[ (i-1) + j*(N+2) ] + 
+                                        utmp[ i + (j-1)*(N+2) ] +
+                                        utmp[ (i+1) + j*(N+2) ] +
+                                        utmp[ i + (j+1)*(N+2) ]);
             }
         }
         copy_into( (N+2)*(N+2), utmp, u );
@@ -78,7 +92,7 @@ int jacobi(int N, double *u0, double *f, double *u)
 
 int main(int argc, char** argv) 
 {
-    printf("Jacobi iteration with parallelism\n");
+    printf("Gauss-Seidel iteration with parallelism\n");
     int N = read_option<long>("-n", argc, argv);
     int nghost = (N+2)*(N+2);
     Timer t;
@@ -98,10 +112,9 @@ int main(int argc, char** argv)
 
     printf("Initial residue: %.4e\n", lresidual(N, u, f));
     t.tic();
-    int its = jacobi(N, u0, f, u);
+    int its = GaussSeidel(N, u0, f, u);
     double time = t.toc();
     printf("%d iterations and %.4f seconds: Final residue: %.4e\n", its, time, lresidual(N, u, f));
-
 
     free(f); free(u0); free(u);
 }
