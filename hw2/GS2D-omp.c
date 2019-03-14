@@ -2,10 +2,15 @@
 // Author: Abhijit Chowdhary (ac6361)
 
 #include <math.h>
-#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "utils.h"
+
+#ifndef _OPENMP
+    #include <omp.h>
+#else
+    #define omp_get_thread_num() 0
+#endif
 
 #define NUM_ITER 5000
 #define TOL 0.01
@@ -84,7 +89,6 @@ int GaussSeidel(int N, double *u0, double *f, double *u)
             }
         }
         copy_into( (N+2)*(N+2), utmp, u );
-        res = lresidual(N, u, f);
     }
     free(utmp);
     return it;
@@ -96,8 +100,6 @@ int main(int argc, char** argv)
     int N = read_option<long>("-n", argc, argv);
     int nghost = (N+2)*(N+2);
     Timer t;
-
-    printf("Working with %d threads.\n", omp_get_num_procs());
 
     // Malloc structures. Note we leave room for ghost points.
     double *f = (double*) malloc(nghost*sizeof(double));

@@ -13,7 +13,7 @@
 
 float a[VECLEN], b[VECLEN], sum;
 
-float dotprod ()
+void dotprod ()
 {
 int i, tid;
 //float sum;

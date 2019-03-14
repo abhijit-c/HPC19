@@ -5,7 +5,7 @@
 #include <omp.h>
 #include "utils.h"
 
-#define BLOCK_SIZE 32
+#define BLOCK_SIZE 8
 
 // Note: matrices are stored in column major order; i.e. the array elements in
 // the (m x n) matrix C are stored in the sequence: {C_00, C_10, ..., C_m0,
@@ -73,8 +73,8 @@ int main(int argc, char** argv) {
       MMult1(m, n, k, a, b, c);
     }
     double time = t.toc();
-    double flops = 0; // TODO: calculate from m, n, k, NREPEATS, time
-    double bandwidth = sizeof(double)*(NREPEATS/time)*(2*n+2)*BLOCK_SIZE*BLOCK_SIZE / 1e9;
+    double flops = 3*n*m*(2*k-1)*NREPEATS/ time / 1e9; //Same number of ops
+    double bandwidth = NREPEATS*n*m*k*sizeof(double) / time / 1e9; 
     printf("%10ld %10f %10f %10f", p, time, flops, bandwidth);
 
     double max_err = 0;

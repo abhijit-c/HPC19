@@ -83,8 +83,6 @@ int main(int argc, char** argv)
     int nghost = (N+2)*(N+2);
     Timer t;
 
-    printf("Working with %d threads.\n", omp_get_num_procs());
-
     // Malloc structures. Note we leave room for ghost points.
     double *f = (double*) malloc(nghost*sizeof(double));
     double *u0 = (double*) malloc(nghost*sizeof(double));
