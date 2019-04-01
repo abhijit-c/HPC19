@@ -34,30 +34,28 @@ void scan_omp(long* prefix_sum, const long* A, long n) {
     int tid = omp_get_thread_num();
     long l0 = ( tid )*(n/num_threads); 
     long ln = (tid+1==num_threads) ? n : (tid+1)*(n/num_threads); 
-    printf("[%d, %d]\n", l0, ln);
     scan_seq(prefix_sum+l0, A+l0, ln-l0);
   }
 
-  
   for (int tid = 1; tid < num_threads; tid++)
   { //Correct regiod of tid
     long l0 = ( tid )*(n/num_threads); 
     long ln = (tid+1==num_threads) ? n : (tid+1)*(n/num_threads); 
     for (long k = l0; k < ln; k++) 
     { 
-      prefix_sum[k] += prefix_sum[l0-1]; 
+      prefix_sum[k] += prefix_sum[l0-1] + A[l0-1]; 
     }
   }
-  
 }
 
 int main() {
   //long N = 1000000;
-  long N = 16;
+  long N = 10000000;
   long* A = (long*) malloc(N * sizeof(long));
   long* B0 = (long*) malloc(N * sizeof(long));
   long* B1 = (long*) malloc(N * sizeof(long));
   for (long i = 0; i < N; i++) A[i] = rand();
+  //for (long i = 0; i < N; i++) A[i] = i;
 
   double tt = omp_get_wtime();
   scan_seq(B0, A, N);
@@ -71,7 +69,7 @@ int main() {
   for (long i = 0; i < N; i++) 
   {
     err = std::max(err, std::abs(B0[i] - B1[i]));
-    printf("%d vs %d\n", B0[i], B1[i]);
+    //printf("A[i] = %d: %d vs %d\n", A[i], B0[i], B1[i]);
   }
   printf("error = %ld\n", err);
 
