@@ -27,6 +27,7 @@ void scan_seq(long* prefix_sum, const long* A, long n) {
 void scan_omp(long* prefix_sum, const long* A, long n) {
   // TODO: implement multi-threaded OpenMP scan
   int num_threads = _omp_thread_count();
+  long corrector [num_threads];
   if (n < num_threads) { scan_seq(prefix_sum, A, n); }
   
   #pragma omp parallel
@@ -35,8 +36,22 @@ void scan_omp(long* prefix_sum, const long* A, long n) {
     long l0 = ( tid )*(n/num_threads); 
     long ln = (tid+1==num_threads) ? n : (tid+1)*(n/num_threads); 
     scan_seq(prefix_sum+l0, A+l0, ln-l0);
+    corrector[tid] = (tid==0) ? 0 : prefix_sum[ln] + A[ln];
   }
 
+  /*
+  #pragma omp parallel for
+  for (int tid = 1; tid < num_threads; tid++)
+  { //Correct regiod of tid
+    long l0 = ( tid )*(n/num_threads); 
+    long ln = (tid+1==num_threads) ? n : (tid+1)*(n/num_threads); 
+    for (long k = l0; k < ln; k++) 
+    { 
+      prefix_sum[k] += corrector[tid];
+    }
+  }
+  */
+  ///*
   for (int tid = 1; tid < num_threads; tid++)
   { //Correct regiod of tid
     long l0 = ( tid )*(n/num_threads); 
@@ -46,11 +61,12 @@ void scan_omp(long* prefix_sum, const long* A, long n) {
       prefix_sum[k] += prefix_sum[l0-1] + A[l0-1]; 
     }
   }
+  //*/
 }
 
 int main() {
-  //long N = 1000000;
-  long N = 10000000;
+  long N = 1000000;
+  //long N = 1000000000;
   long* A = (long*) malloc(N * sizeof(long));
   long* B0 = (long*) malloc(N * sizeof(long));
   long* B1 = (long*) malloc(N * sizeof(long));
@@ -58,11 +74,11 @@ int main() {
   //for (long i = 0; i < N; i++) A[i] = i;
 
   double tt = omp_get_wtime();
-  scan_seq(B0, A, N);
+  for (int k = 0; k < 100; k++) scan_seq(B0, A, N);
   printf("sequential-scan = %fs\n", omp_get_wtime() - tt);
 
   tt = omp_get_wtime();
-  scan_omp(B1, A, N);
+  for (int k = 0; k < 100; k++) scan_omp(B1, A, N);
   printf("parallel-scan   = %fs\n", omp_get_wtime() - tt);
 
   long err = 0;
