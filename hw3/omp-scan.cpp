@@ -26,8 +26,7 @@ void scan_seq(long* prefix_sum, const long* A, long n) {
 
 void scan_omp(long* prefix_sum, const long* A, long n) {
   // TODO: implement multi-threaded OpenMP scan
-  //int num_threads = _omp_thread_count();
-  int num_threads = 48;
+  int num_threads = _omp_thread_count();
   long corrector [num_threads];
   if (n < num_threads) { scan_seq(prefix_sum, A, n); }
   
