@@ -37,25 +37,26 @@ void scan_omp(long* prefix_sum, const long* A, long n) {
     long ln = (tid+1==num_threads) ? n : (tid+1)*(n/num_threads); 
     scan_seq(prefix_sum+l0, A+l0, ln-l0);
     corrector[tid] = prefix_sum[ln-1] + A[ln-1];
-  }
-
-  #pragma omp parallel for
-  for (int tid = 1; tid < num_threads; tid++)
-  { //Correct regiod of tid
-    long l0 = ( tid )*(n/num_threads); 
-    long ln = (tid+1==num_threads) ? n : (tid+1)*(n/num_threads); 
-    long c = 0.0;
-    for (long r = 0; r < tid; r++) 
-      c += corrector[r];
-    for (long k = l0; k < ln; k++) 
-    { 
-      prefix_sum[k] += c;
+    #pragma omp barrier
+    #pragma omp single
+    {
+      for (long tid = 1; tid < num_threads; tid++)
+      {
+        corrector[tid] += corrector[tid-1];
+      }
+    }
+    if (tid != 0)
+    {
+      for (long k = l0; k < ln; k++) 
+      { 
+        prefix_sum[k] += corrector[tid-1];
+      }
     }
   }
 }
 
 int main() {
-  long N = 50000000;
+  long N = 100000000;
   long* A = (long*) malloc(N * sizeof(long));
   long* B0 = (long*) malloc(N * sizeof(long));
   long* B1 = (long*) malloc(N * sizeof(long));
