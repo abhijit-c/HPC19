@@ -35,20 +35,18 @@ void scan_omp(long* prefix_sum, const long* A, long n) {
     int tid = omp_get_thread_num();
     long l0 = ( tid )*(n/num_threads); 
     long ln = (tid+1==num_threads) ? n : (tid+1)*(n/num_threads); 
+
     scan_seq(prefix_sum+l0, A+l0, ln-l0);
     corrector[tid] = prefix_sum[ln-1] + A[ln-1];
     #pragma omp barrier
     #pragma omp single
     {
-      for (long tid = 1; tid < num_threads; tid++)
-      {
+      for (long tid = 1; tid < num_threads; tid++) {
         corrector[tid] += corrector[tid-1];
       }
     }
-    if (tid != 0)
-    {
-      for (long k = l0; k < ln; k++) 
-      { 
+    if (tid != 0) {
+      for (long k = l0; k < ln; k++) { 
         prefix_sum[k] += corrector[tid-1];
       }
     }
