@@ -10,7 +10,9 @@ header-includes:
 
 # Parallel Scan
 I'm running this on NYU's Dumbo0 server, which has 48 cores avaliable
-corresponding to a ``Intel(R) Xeon(R) CPU E5-2680 v3 @ 2.50GHz``.
+corresponding to a ``Intel(R) Xeon(R) CPU E5-2680 v3 @ 2.50GHz``. (Sorry, I
+learned this lecture that this was the file node, and I shouldn't be running on
+this)
 
 | Number of Cores | Runtime  |
 |-----------------|----------|
