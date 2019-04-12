@@ -4,26 +4,39 @@
 #include <string>
 #include <math.h>
 
-// Influence from nvidia's cuda c programming guide
-
-typedef struct
+double vector_norm(double *a, long N)
 {
-  long width;
-  long height;
-  double* elements;
-} Matrix;
+  double norm = 0.0;
+  #pragma omp parallel for schedule(static) reduction(+:norm)
+  for (long k = 0; k < N; k++) 
+  { 
+    double t = a[k];
+    norm += t*t; 
+  }
+  return sqrt(norm);
+}
 
-typedef struct
+double vector_err(double *a, double *b, long N)
 {
-  long length;
-  double* elements;
-} Vector;
+  double norm = 0.0;
+  #pragma omp parallel for schedule(static) reduction(+:norm)
+  for (long k = 0; k < N; k++) 
+  { 
+    double t = a[k] - b[k];
+    norm += t*t; 
+  }
+  return sqrt(norm);
+}
 
-void mvec_cpu(double* y, const double* a, const double* x, long N){
-  double sum = 0;
-  #pragma omp parallel for schedule(static) reduction(+:sum)
-  for (long i = 0; i < N; i++) sum += a[i]*b[i];
-  *dot_ptr = sum;
+void mvec_cpu(double *y, const double* A, const double* x, long N)
+{ //Compute y = A*x where A is (n X n) and x is (n X 1) row major.
+  for (long k = 0; k < N; k++)
+  { // y_k = sum_i A_ki * x_i = dot(A_k:, x)
+    double sum = 0;
+    #pragma omp parallel for schedule(static) reduction(+:sum)
+    for (long i = 0; i < N; i++) { sum += A[i+k*N]*x[i]; }
+    y[k] = sum;
+  }
 }
 
 void Check_CUDA_Error(const char *message){
@@ -98,54 +111,76 @@ __global__ void reduction_kernel(double* sum, const double* a, long N){
 }
 
 int main() {
-  long N = (1UL<<25);
+  long N = (1UL<<12);
 
-  double *x, *y;
-  cudaMallocHost((void**)&x, N * sizeof(double));
-  cudaMallocHost((void**)&y, N * sizeof(double));
+  // Allocate and initialize matrices and vectors.
+  double *A, *x, *y_c, *y_g;
+  cudaMallocHost((void**)&A, N * N * sizeof(double)); // A row-major matrix
+  cudaMallocHost((void**)&x, N * sizeof(double)); // x vector
+  cudaMallocHost((void**)&y_c, N * sizeof(double)); // cpu resultant vector
+  cudaMallocHost((void**)&y_g, N * sizeof(double)); // gpu resultant vector
   #pragma omp parallel for schedule(static)
-  for (long i = 0; i < N; i++) { x[i] = y[i] = 1.0/sqrt(N); }
+  for (long i = 0; i < N; i++) { x[i] = y_c[i] = y_g[i] = 1.0/sqrt(N); }
+  #pragma omp parallel for schedule(static)
+  for (long i = 0; i < N*N; i++) { A[i] = 1.0; }
 
-  double dot_ref, dot;
+  // Compute CPU Matrix Vector Product.
+  //double dot_ref, dot;
   double tt = omp_get_wtime();
-  dot_reduction(&dot_ref, x, y, N);
-  printf("CPU Bandwidth = %f GB/s\n", 1*N*sizeof(double) / (omp_get_wtime()-tt)/1e9);
+  mvec_cpu(y_c, A, x, N);
+  printf("CPU Bandwidth = %f GB/s\n", 1*N*N*sizeof(double) / (omp_get_wtime()-tt)/1e9);
 
-  double *x_d, *y_d, *temp_d;
+  // Initialize and allocate GPU matrices and vectors
+  double *x_d, *A_d, *temp_d;
   cudaMalloc(&x_d, N*sizeof(double));
-  cudaMalloc(&y_d, N*sizeof(double));
+  cudaMalloc(&A_d, N*N*sizeof(double));
   long N_work = 1;
   for (long i = (N+BLOCK_SIZE-1)/(BLOCK_SIZE); i > 1; i = (i+BLOCK_SIZE-1)/(BLOCK_SIZE)) N_work += i;
-  cudaMalloc(&temp_d, N_work*sizeof(double)); // extra memory buffer for reduction across thread-blocks
+  cudaMalloc(&temp_d, N_work*N_work*sizeof(double)); // extra memory buffer for reduction across thread-blocks
 
+  // Copy host matrices to GPU
   cudaMemcpyAsync(x_d, x, N*sizeof(double), cudaMemcpyHostToDevice);
-  cudaMemcpyAsync(y_d, y, N*sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpyAsync(A_d, A, N*N*sizeof(double), cudaMemcpyHostToDevice);
   cudaDeviceSynchronize();
+
+  // Begin Matrix Vector Product
   tt = omp_get_wtime();
 
-  double* sum_d = temp_d;
   long Nb = (N+BLOCK_SIZE-1)/(BLOCK_SIZE);
-  reduction_kernel<<<Nb,BLOCK_SIZE>>>(sum_d, x_d, y_d, N);
-  while (Nb > 1) {
-    long N = Nb;
-    Nb = (Nb+BLOCK_SIZE-1)/(BLOCK_SIZE);
-    reduction_kernel<<<Nb,BLOCK_SIZE>>>(sum_d + N, sum_d, N);
-    sum_d += N;
+  for (long k = 0; k < N; k++)
+  {
+    double* sum_d = temp_d+k*N_work;
+    reduction_kernel<<<Nb,BLOCK_SIZE>>>(sum_d, A_d+N*k, x_d, N);
+    while (Nb > 1) 
+    {
+      long N = Nb;
+      Nb = (Nb+BLOCK_SIZE-1)/(BLOCK_SIZE);
+      reduction_kernel<<<Nb,BLOCK_SIZE>>>(sum_d + N, sum_d, N);
+      sum_d += N;
+    }
+    cudaMemcpyAsync(&(y_g[k]), sum_d, 1*sizeof(double), cudaMemcpyDeviceToHost);
   }
 
-
-  cudaMemcpyAsync(&dot, sum_d, 1*sizeof(double), cudaMemcpyDeviceToHost);
   cudaDeviceSynchronize();
-  printf("GPU Bandwidth = %f GB/s\n", 1*N*sizeof(double) / (omp_get_wtime()-tt)/1e9);
-  printf("CPU: %e \t GPU: %e\n", dot_ref, dot);
-  printf("Error = %f\n", fabs(dot-dot_ref));
+  printf("GPU Bandwidth = %f GB/s\n", 1*N*N*sizeof(double) / (omp_get_wtime()-tt)/1e9);
+
+  for (long k = 0; k < 10; k++)
+  {
+    printf("k=%ld\t y_g[k] = %f\n", k, y_g[k]);
+  }
+
+  printf("||y_c|| = %f\n", vector_norm(y_c, N));
+  printf("||y_g|| = %f\n", vector_norm(y_g, N));
+  printf("Error = %f\n", vector_err(y_c, y_g, N));
+
 
   cudaFree(x_d);
-  cudaFree(y_d);
+  cudaFree(A_d);
   cudaFree(temp_d);
   cudaFreeHost(x);
-  cudaFreeHost(y);
+  cudaFreeHost(A);
+  cudaFreeHost(y_c);
+  cudaFreeHost(y_g);
 
   return 0;
 }
-
