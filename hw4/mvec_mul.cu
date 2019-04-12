@@ -4,7 +4,22 @@
 #include <string>
 #include <math.h>
 
-void dot_reduction(double* dot_ptr, const double* a, const double* b, long N){
+// Influence from nvidia's cuda c programming guide
+
+typedef struct
+{
+  long width;
+  long height;
+  double* elements;
+} Matrix;
+
+typedef struct
+{
+  long length;
+  double* elements;
+} Vector;
+
+void mvec_cpu(double* y, const double* a, const double* x, long N){
   double sum = 0;
   #pragma omp parallel for schedule(static) reduction(+:sum)
   for (long i = 0; i < N; i++) sum += a[i]*b[i];
