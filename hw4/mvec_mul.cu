@@ -136,7 +136,7 @@ int main() {
   cudaMalloc(&A_d, N*N*sizeof(double));
   long N_work = 1;
   for (long i = (N+BLOCK_SIZE-1)/(BLOCK_SIZE); i > 1; i = (i+BLOCK_SIZE-1)/(BLOCK_SIZE)) N_work += i;
-  cudaMalloc(&temp_d, N_work*N_work*sizeof(double)); // extra memory buffer for reduction across thread-blocks
+  cudaMalloc(&temp_d, N*N_work*sizeof(double)); // extra memory buffer for reduction across thread-blocks
 
   // Copy host matrices to GPU
   cudaMemcpyAsync(x_d, x, N*sizeof(double), cudaMemcpyHostToDevice);

@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++11 -O3 -march=native -fopenmp
+CXXFLAGS = -std=c++11 -O3 -march=native -fopenmp -Wall 
 
 CUDA_INCDIR = -I $(CUDA_HOME)/include -I $(CUDA_HOME)/samples/common/inc
 CUDA_LIBS = -lblas -L${CUDA_HOME}/lib64 -lcudart -lcublas
