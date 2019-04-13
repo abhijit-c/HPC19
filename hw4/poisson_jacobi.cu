@@ -29,10 +29,10 @@ double presidual(const long N, const double *u, const double *f)
     {
         for (int i = 1; i < N-1; i++)
         {
-            double v = ihsq * (- u[(i-1)+j*(N+2)] - u[i+(j-1)*(N+2)]
-                               + 4*u[i+j*(N+2)]
-                               - u[(i+1)+j*(N+2)] - u[i+(j+1)*(N+2)] )
-                               - f[i+j*(N+2)];
+            double v = ihsq * (- u[(i-1)+j*N] - u[i+(j-1)*N]
+                               + 4*u[i+j*N]
+                               - u[(i+1)+j*N] - u[i+(j+1)*N] )
+                               - f[i+j*N];
             resid += v*v;
         }
     }
@@ -68,15 +68,17 @@ void jacobi_step_cpu(double *u, const double *u0, const double *f, const long N)
 __global__ void jacobi_step_gpu(
                 double *u, const double *u0, const double *f, const long N)
 {
+
   int idx = (blockIdx.x) * blockDim.x + threadIdx.x;
   int jdx = (blockIdx.y) * blockDim.y + threadIdx.y;
   double h = 1.0 / (double)N;
   if (0 < idx && idx < N-1 && 0 < jdx && jdx < N-1)
   { // If not ghost point, compute
-      u[idx*N + jdx] = 0.25 * ( h*h*f[idx*N + jdx] + u0[(idx-1)*N + jdx] + 
-                                                     u0[idx*N + (jdx-1)] + 
-                                                     u0[(idx+1)*N + jdx] + 
-                                                     u0[idx*N + (jdx+1)] );
+    //printf("U(%d,%d) is starting!\n", idx, jdx);
+    u[idx*N + jdx] = 0.25 * ( h*h*f[idx*N + jdx] + u0[(idx-1)*N + jdx] + 
+                                                   u0[idx*N + (jdx-1)] + 
+                                                   u0[(idx+1)*N + jdx] + 
+                                                   u0[idx*N + (jdx+1)] );
   }
 }
 /*
@@ -87,12 +89,12 @@ __global__ void jacobi_step_gpu(
 */
 int main(int argc, char** argv) 
 {
-  const long BLOCK_SIZE = 1024;
+  const long BLOCK_SIZE = 32;
   printf("Jacobi iteration with Cuda vs. OpenMP\n");
 
   const long N = 16;
   const long N_grid = N+2; // Including ghost points
-  const long MAX_ITERATESM1 = 1000;
+  const long MAX_ITERATESM1 = 10000;
   Timer t;
 
   // Malloc structures. Note we leave room for ghost points.
@@ -103,12 +105,11 @@ int main(int argc, char** argv)
   /* BEGIN CPU JACOBI POISSON */
 
   //Initialize vectors.  
-  for (long i = 0; i < N_grid; i++) { f[i] = 1; u0[i] = u[i] = 0; }
+  for (long i = 0; i < N_grid*N_grid; i++) { f[i] = 1; u0[i] = u[i] = 0; }
 
   printf("Initial residue: %.4e\n", presidual(N_grid, u, f));
   t.tic();
 
-  for (int k = 0; k < MAX_ITERATESM1; k += 2)
   for (int k = 0; k < MAX_ITERATESM1; k += 2)
   {
     jacobi_step_cpu(u, u0, f, N_grid);
@@ -121,29 +122,29 @@ int main(int argc, char** argv)
          time, presidual(N_grid, u, f) );
 
   // Reinitialize arrays
-  for (long i = 0; i < N_grid; i++) { f[i] = 1; u0[i] = u[i] = 0; }
+  for (long i = 0; i < N_grid*N_grid; i++) { f[i] = 1; u0[i] = u[i] = 0; }
 
   /* END CPU JACOBI POISSON */ /* BEGIN GPU JACOBI POISSON */
 
-  // Allocate vectors onto GPU and transfer host data.
+  // Allocate vectors onto GPU and transfer host data to device.
   double *f_d, *u_d, *u0_d;
   gpuErrchk( 
     cudaMalloc(&f_d, N_grid*N_grid*sizeof(double)) 
   );
   gpuErrchk( 
-    cudaMemcpyAsync(f_d, f, N_grid*N_grid*sizeof(double), cudaMemcpyHostToDevice) 
+    cudaMemcpy(f_d, f, N_grid*N_grid*sizeof(double), cudaMemcpyHostToDevice) 
   );
   gpuErrchk( 
     cudaMalloc(&u_d, N_grid*N_grid*sizeof(double)) 
   );
   gpuErrchk( 
-    cudaMemcpyAsync(u_d, u, N_grid*N_grid*sizeof(double), cudaMemcpyHostToDevice) 
+    cudaMemcpy(u_d, u, N_grid*N_grid*sizeof(double), cudaMemcpyHostToDevice) 
   );
   gpuErrchk( 
     cudaMalloc(&u0_d, N_grid*N_grid*sizeof(double)) 
   );
   gpuErrchk( 
-    cudaMemcpyAsync(u0_d, u0, N_grid*N_grid*sizeof(double), cudaMemcpyHostToDevice) 
+    cudaMemcpy(u0_d, u0, N_grid*N_grid*sizeof(double), cudaMemcpyHostToDevice) 
   );
   cudaDeviceSynchronize();
 
@@ -165,7 +166,7 @@ int main(int argc, char** argv)
   jacobi_step_gpu<<<gridDim, blockDim>>>(u_d, u0_d, f_d, N_grid);
 
   gpuErrchk( 
-    cudaMemcpyAsync(u, u_d, N_grid*N_grid*sizeof(double), cudaMemcpyDeviceToHost) 
+    cudaMemcpy(u, u_d, N_grid*N_grid*sizeof(double), cudaMemcpyDeviceToHost) 
   );
   cudaDeviceSynchronize();
 
