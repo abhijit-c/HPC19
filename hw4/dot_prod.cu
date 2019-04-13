@@ -94,7 +94,7 @@ int main() {
   double dot_ref, dot;
   double tt = omp_get_wtime();
   dot_reduction(&dot_ref, x, y, N);
-  printf("CPU Bandwidth = %f GB/s\n", 1*N*sizeof(double) / (omp_get_wtime()-tt)/1e9);
+  printf("CPU Bandwidth = %f GB/s\n", 2*N*sizeof(double) / (omp_get_wtime()-tt)/1e9);
 
   double *x_d, *y_d, *temp_d;
   cudaMalloc(&x_d, N*sizeof(double));
@@ -119,7 +119,7 @@ int main() {
   }
 
 
-  cudaMemcpyAsync(&dot, sum_d, 1*sizeof(double), cudaMemcpyDeviceToHost);
+  cudaMemcpyAsync(&dot, sum_d, 2*sizeof(double), cudaMemcpyDeviceToHost);
   cudaDeviceSynchronize();
   printf("GPU Bandwidth = %f GB/s\n", 1*N*sizeof(double) / (omp_get_wtime()-tt)/1e9);
   printf("CPU: %e \t GPU: %e\n", dot_ref, dot);

@@ -3,6 +3,8 @@
 #include <math.h>
 #include "utils.h"
 
+#define BLOCK_SIZE 32
+
 /* https://stackoverflow.com/a/14038590/5832371
  * CUDA GPU error checking.
 */
@@ -63,22 +65,29 @@ void jacobi_step_cpu(double *u, const double *u0, const double *f, const long N)
 /*
  * GPU Jacobi Poisson Step:
  * Computes one step of u[i,j] = (1/4)*(h^2 f[i,j] + u0[i-1,j]  + u0[i,j-1]  +
- * u0[i+1,j]  + u0[i,j+1]).
+ * u0[i+1,j]  + u0[i,j+1]) for idx*BLOCK_SIZE <= i < (idx+1)*BLOCK_SIZE and
+ * jdx*BLOCK_SIZE <= j < (jdx+1)*BLOCK_SIZE.
  */
 __global__ void jacobi_step_gpu(
                 double *u, const double *u0, const double *f, const long N)
 {
-
   int idx = (blockIdx.x) * blockDim.x + threadIdx.x;
   int jdx = (blockIdx.y) * blockDim.y + threadIdx.y;
+  int offset = ( (N % 32 == 0) ? (N / BLOCK_SIZE) : (N / BLOCK_SIZE + 1) );
   double h = 1.0 / (double)N;
-  if (0 < idx && idx < N-1 && 0 < jdx && jdx < N-1)
-  { // If not ghost point, compute
-    //printf("U(%d,%d) is starting!\n", idx, jdx);
-    u[idx*N + jdx] = 0.25 * ( h*h*f[idx*N + jdx] + u0[(idx-1)*N + jdx] + 
-                                                   u0[idx*N + (jdx-1)] + 
-                                                   u0[(idx+1)*N + jdx] + 
-                                                   u0[idx*N + (jdx+1)] );
+  for (long i = idx*offset; i < (idx+1)*offset; i++)
+  {
+    for (long j = jdx*offset; j < (jdx+1)*offset; j++)
+    {
+      if (0 < i && i < N-1 && 0 < j && j < N-1)
+      { // If not ghost point, compute
+        //printf("U(%d,%d) is starting!\n", idx, jdx);
+        u[i*N + j] = 0.25 * ( h*h*f[i*N + j] + u0[(i-1)*N + j] + 
+                                               u0[i*N + (j-1)] + 
+                                               u0[(i+1)*N + j] + 
+                                               u0[i*N + (j+1)] );
+      }
+    }
   }
 }
 /*
@@ -89,7 +98,6 @@ __global__ void jacobi_step_gpu(
 */
 int main(int argc, char** argv) 
 {
-  const long BLOCK_SIZE = 32;
   printf("Jacobi iteration with Cuda vs. OpenMP\n");
 
   const long N = 16;
