@@ -49,7 +49,7 @@ double presidual(const long N, const double *u, const double *f)
 void jacobi_step_cpu(double *u, const double *u0, const double *f, const long N)
 {
   double h = 1.0 / (double)N;
-  #pragma omp parallel for collapse(2)
+  //#pragma omp parallel for collapse(2)
   for (long i = 1; i < N-1; i++)
   {
     for (long j = 1; j < N-1; j++)
@@ -69,11 +69,12 @@ void jacobi_step_cpu(double *u, const double *u0, const double *f, const long N)
  * jdx*BLOCK_SIZE <= j < (jdx+1)*BLOCK_SIZE.
  */
 __global__ void jacobi_step_gpu(
-                double *u, const double *u0, const double *f, const long N)
+                double *u, const double *u0, const double *f, 
+                const long N)
 {
   int idx = (blockIdx.x) * blockDim.x + threadIdx.x;
   int jdx = (blockIdx.y) * blockDim.y + threadIdx.y;
-  int offset = ( (N % 32 == 0) ? (N / BLOCK_SIZE) : (N / BLOCK_SIZE + 1) );
+  int offset = ( (N % BLOCK_SIZE == 0) ? (N / BLOCK_SIZE) : (N / BLOCK_SIZE + 1) );
   double h = 1.0 / (double)N;
   for (long i = idx*offset; i < (idx+1)*offset; i++)
   {
@@ -81,7 +82,6 @@ __global__ void jacobi_step_gpu(
     {
       if (0 < i && i < N-1 && 0 < j && j < N-1)
       { // If not ghost point, compute
-        //printf("U(%d,%d) is starting!\n", idx, jdx);
         u[i*N + j] = 0.25 * ( h*h*f[i*N + j] + u0[(i-1)*N + j] + 
                                                u0[i*N + (j-1)] + 
                                                u0[(i+1)*N + j] + 
@@ -98,11 +98,11 @@ __global__ void jacobi_step_gpu(
 */
 int main(int argc, char** argv) 
 {
-  printf("Jacobi iteration with Cuda vs. OpenMP\n");
+  printf("Jacobi iteration with Cuda vs. CPU\n");
 
-  const long N = 16;
+  const long N = 256;
   const long N_grid = N+2; // Including ghost points
-  const long MAX_ITERATESM1 = 10000;
+  const long MAX_ITERATESM1 = 1000;
   Timer t;
 
   // Malloc structures. Note we leave room for ghost points.
@@ -161,6 +161,7 @@ int main(int argc, char** argv)
   int GRID_SIZE = 0; // For some reason this breaks when BLOCK_SIZE defined.
   if ( N % BLOCK_SIZE == 0) { GRID_SIZE = N / BLOCK_SIZE; }
   else { GRID_SIZE = (N / BLOCK_SIZE) + 1; }
+
   dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE);
   dim3 gridDim(GRID_SIZE, GRID_SIZE); // From lecture9/filter.cu
 
