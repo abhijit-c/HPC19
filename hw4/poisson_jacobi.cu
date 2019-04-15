@@ -90,9 +90,9 @@ int main(int argc, char** argv)
 {
   printf("Jacobi iteration with Cuda vs. CPU\n");
 
-  const long N = 1<<10;
+  const long N = 1<<12;
   const long N_grid = N+2; // Including ghost points
-  const long MAX_ITERATESM1 = 1000;
+  const long MAX_ITERATESM1 = 10000;
   Timer t;
 
   // Malloc structures. Note we leave room for ghost points.
@@ -108,12 +108,14 @@ int main(int argc, char** argv)
   printf("Initial residue: %.4e\n", presidual(N_grid, u, f));
   t.tic();
 
+  /*
   for (int k = 0; k < MAX_ITERATESM1; k += 2)
   {
     jacobi_step_cpu(u, u0, f, N_grid);
     jacobi_step_cpu(u0, u, f, N_grid);
   }
   jacobi_step_cpu(u, u0, f, N_grid);
+  */
 
   double time = t.toc();
   printf("CPU computation: %.4f seconds: Final residue: %.4e\n", 
