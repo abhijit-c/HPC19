@@ -111,7 +111,7 @@ __global__ void reduction_kernel(double* sum, const double* a, long N){
 }
 
 int main() {
-  long N = (1UL<<12);
+  long N = (1UL<<5);
 
   // Allocate and initialize matrices and vectors.
   double *A, *x, *y_c, *y_g;
@@ -136,7 +136,7 @@ int main() {
   cudaMalloc(&A_d, N*N*sizeof(double));
   long N_work = 1;
   for (long i = (N+BLOCK_SIZE-1)/(BLOCK_SIZE); i > 1; i = (i+BLOCK_SIZE-1)/(BLOCK_SIZE)) N_work += i;
-  cudaMalloc(&temp_d, N*N_work*sizeof(double)); // extra memory buffer for reduction across thread-blocks
+  cudaMalloc(&temp_d, N_work*sizeof(double)); // extra memory buffer for reduction across thread-blocks
 
   // Copy host matrices to GPU
   cudaMemcpyAsync(x_d, x, N*sizeof(double), cudaMemcpyHostToDevice);
@@ -149,14 +149,14 @@ int main() {
   long Nb = (N+BLOCK_SIZE-1)/(BLOCK_SIZE);
   for (long k = 0; k < N; k++)
   {
-    double* sum_d = temp_d+k*N_work;
+    double* sum_d = temp_d;
     reduction_kernel<<<Nb,BLOCK_SIZE>>>(sum_d, A_d+N*k, x_d, N);
     while (Nb > 1) 
     {
-      long N = Nb;
+      long M = Nb;
       Nb = (Nb+BLOCK_SIZE-1)/(BLOCK_SIZE);
-      reduction_kernel<<<Nb,BLOCK_SIZE>>>(sum_d + N, sum_d, N);
-      sum_d += N;
+      reduction_kernel<<<Nb,BLOCK_SIZE>>>(sum_d + M, sum_d, N);
+      sum_d += M;
     }
     cudaMemcpyAsync(&(y_g[k]), sum_d, 1*sizeof(double), cudaMemcpyDeviceToHost);
   }
