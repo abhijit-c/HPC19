@@ -111,7 +111,7 @@ __global__ void reduction_kernel(double* sum, const double* a, long N){
 }
 
 int main() {
-  long N = (1UL<<5);
+  long N = (1UL<<12);
 
   // Allocate and initialize matrices and vectors.
   double *A, *x, *y_c, *y_g;
@@ -128,7 +128,7 @@ int main() {
   //double dot_ref, dot;
   double tt = omp_get_wtime();
   mvec_cpu(y_c, A, x, N);
-  printf("CPU Bandwidth = %f GB/s\n", 1*N*N*sizeof(double) / (omp_get_wtime()-tt)/1e9);
+  printf("CPU Bandwidth = %f GB/s\n", 4*N*N*sizeof(double) / (omp_get_wtime()-tt)/1e9);
 
   // Initialize and allocate GPU matrices and vectors
   double *x_d, *A_d, *temp_d;
@@ -162,15 +162,8 @@ int main() {
   }
 
   cudaDeviceSynchronize();
-  printf("GPU Bandwidth = %f GB/s\n", 1*N*N*sizeof(double) / (omp_get_wtime()-tt)/1e9);
+  printf("GPU Bandwidth = %f GB/s\n", 4*N*N*sizeof(double) / (omp_get_wtime()-tt)/1e9);
 
-  for (long k = 0; k < 10; k++)
-  {
-    printf("k=%ld\t y_g[k] = %f\n", k, y_g[k]);
-  }
-
-  printf("||y_c|| = %f\n", vector_norm(y_c, N));
-  printf("||y_g|| = %f\n", vector_norm(y_g, N));
   printf("Error = %f\n", vector_err(y_c, y_g, N));
 
 

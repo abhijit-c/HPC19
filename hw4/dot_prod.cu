@@ -112,16 +112,16 @@ int main() {
   long Nb = (N+BLOCK_SIZE-1)/(BLOCK_SIZE);
   reduction_kernel<<<Nb,BLOCK_SIZE>>>(sum_d, x_d, y_d, N);
   while (Nb > 1) {
-    long N = Nb;
+    long M = Nb;
     Nb = (Nb+BLOCK_SIZE-1)/(BLOCK_SIZE);
-    reduction_kernel<<<Nb,BLOCK_SIZE>>>(sum_d + N, sum_d, N);
-    sum_d += N;
+    reduction_kernel<<<Nb,BLOCK_SIZE>>>(sum_d + M, sum_d, N);
+    sum_d += M;
   }
 
 
-  cudaMemcpyAsync(&dot, sum_d, 2*sizeof(double), cudaMemcpyDeviceToHost);
+  cudaMemcpyAsync(&dot, sum_d, 1*sizeof(double), cudaMemcpyDeviceToHost);
   cudaDeviceSynchronize();
-  printf("GPU Bandwidth = %f GB/s\n", 1*N*sizeof(double) / (omp_get_wtime()-tt)/1e9);
+  printf("GPU Bandwidth = %f GB/s\n", 2*N*sizeof(double) / (omp_get_wtime()-tt)/1e9);
   printf("CPU: %e \t GPU: %e\n", dot_ref, dot);
   printf("Error = %f\n", fabs(dot-dot_ref));
 
