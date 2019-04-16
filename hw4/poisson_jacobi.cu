@@ -108,14 +108,12 @@ int main(int argc, char** argv)
   printf("Initial residue: %.4e\n", presidual(N_grid, u, f));
   t.tic();
 
-  /*
   for (int k = 0; k < MAX_ITERATESM1; k += 2)
   {
     jacobi_step_cpu(u, u0, f, N_grid);
     jacobi_step_cpu(u0, u, f, N_grid);
   }
   jacobi_step_cpu(u, u0, f, N_grid);
-  */
 
   double time = t.toc();
   printf("CPU computation: %.4f seconds: Final residue: %.4e\n", 

@@ -111,7 +111,7 @@ __global__ void reduction_kernel(double* sum, const double* a, long N){
 }
 
 int main() {
-  long N = (1UL<<12);
+  long N = (1UL<<10);
 
   // Allocate and initialize matrices and vectors.
   double *A, *x, *y_c, *y_g;
