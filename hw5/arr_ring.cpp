@@ -40,7 +40,7 @@ int main(int argc, char** argv)
   if (mpirank == 0)
   {
     printf("Bandwidth: %f Gbytes/s\n", 
-           Nrepeat*mpisize*sizeof(int)*numel / ttavg / 1e9);
+           1*Nrepeat*mpisize*sizeof(int)*numel / ttavg / 1e9);
   }
   //Exit workers, ring done.
   MPI_Finalize();
