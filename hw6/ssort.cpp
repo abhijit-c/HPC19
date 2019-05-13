@@ -7,16 +7,24 @@
 
 int main( int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
+  MPI_Status status, status1;
 
   int rank, p;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &p);
 
+  /* get name of host running MPI process */
+  char processor_name[MPI_MAX_PROCESSOR_NAME];
+  int name_len;
+  MPI_Get_processor_name(processor_name, &name_len);
+  printf("Rank %d/%d running on %s.\n", rank, p, processor_name);
+
   // Number of random numbers per processor (this should be increased
   // for actual tests or could be passed in through the command line
   int N;
   sscanf(argv[1], "%d", &N);
-  int N = 100;
+
+  MPI_Barrier(MPI_COMM_WORLD);
 
   int* vec = (int*)malloc(N*sizeof(int));
   // seed random number generator differently on every core
@@ -27,6 +35,8 @@ int main( int argc, char *argv[]) {
     vec[i] = rand();
   }
   printf("rank: %d, first entry: %d\n", rank, vec[0]);
+
+  MPI_Barrier(MPI_COMM_WORLD);
 
   // sort locally
   std::sort(vec, vec+N);
@@ -62,6 +72,20 @@ int main( int argc, char *argv[]) {
   // do a local sort of the received data
 
   // every process writes its result to a file
+  FILE* fd = NULL;
+  char filename[256];
+  snprintf(filename, 256, "ssort_output/%02d.txt", rank);
+  fd = fopen(filename,"w+");
+
+  if(NULL == fd) {
+    printf("Error opening file \n");
+    return 1;
+  }
+
+  fprintf(fd, "Process %d has values :\n", rank);
+  for(int i = 0; i < N; ++i) { fprintf(fd, "  %d\n", vec[i]); }
+
+  fclose(fd);
 
   free(vec);
   MPI_Finalize();
