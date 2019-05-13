@@ -43,14 +43,31 @@ int main( int argc, char *argv[]) {
 
   // sample p-1 entries from vector as the local splitters, i.e.,
   // every N/P-th entry of the sorted vector
+  int *sample = (int *)malloc((p-1)*sizeof(int));
+  for (int k = 0; k < p-1; ++k) { sample[k] = vec[k*(n/p)]; }
 
   // every process communicates the selected entries to the root
   // process; use for instance an MPI_Gather
+  int *world_samples = NULL;
+  if (p == 0) 
+  { 
+    world_samples = (int *)malloc(sizeof(int)*(p-1)*p); 
+  }
+  MPI_Gather(&sample, p-1, MPI_INT, 
+             world_samples, p-1, MPI_INT, 0,
+             MPI_COMM_WORLD);
 
   // root process does a sort and picks (p-1) splitters (from the
   // p(p-1) received elements)
+  if (p == 0) 
+  { 
+    std::sort(world_samples, world_samples + p*(p-1));
+    for (int k = 0; k < p-1; ++k) { sample[k] = vec[k*(p-1)]; } 
+  } 
 
   // root process broadcasts splitters to all other processes
+  MPI_Bcast(Splitter, Numprocs-1, MPI_INT, 0, MPI_COMM_WORLD);
+
 
   // every process uses the obtained splitters to decide which
   // integers need to be sent to which other process (local bins).
