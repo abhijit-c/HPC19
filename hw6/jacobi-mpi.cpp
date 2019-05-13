@@ -1,7 +1,7 @@
 /* MPI-parallel Jacobi smoothing to solve -u''=f
  * Global vector has N unknowns, each processor works with its
  * part, which has lN = N/p unknowns.
- * Author: Georg Stadler
+ * Author: Abhijit Chowdhary ( adapted from Georg Stadler's lecture code )
  */
 #include <stdio.h>
 #include <math.h>
