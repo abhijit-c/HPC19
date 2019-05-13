@@ -81,7 +81,7 @@ int main(int argc, char * argv[])
 
   for (iter = 0; iter < max_iters && gres/gres0 > tol; iter++) 
   {
-
+    printf("%d\n", iter);
     /* Jacobi step for local points */
     for (j = 1; j <= lN; j++)
     {
