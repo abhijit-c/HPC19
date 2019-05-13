@@ -74,7 +74,7 @@ int main( int argc, char *argv[]) {
   // every process writes its result to a file
   FILE* fd = NULL;
   char filename[256];
-  snprintf(filename, 256, "ssort_output/%02d.txt", rank);
+  snprintf(filename, 256, "ssort_output/%02d.out", rank);
   fd = fopen(filename,"w+");
 
   if(NULL == fd) {
