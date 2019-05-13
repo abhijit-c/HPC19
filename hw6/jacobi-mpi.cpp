@@ -17,21 +17,27 @@ int log4(int n)
 
 /* compuate global residual, assuming ghost values are updated */
 double compute_residual(double *lu, int lN, double invhsq){
-  int i;
+  int i, j;
   double tmp, gres = 0.0, lres = 0.0;
 
-  for (i = 1; i <= lN; i++){
-    tmp = ((2.0*lu[i] - lu[i-1] - lu[i+1]) * invhsq - 1);
-    lres += tmp * tmp;
+  for (j = 1; j <= lN; j++)
+  {
+      for (i = 1; i <= lN; i++)
+      {
+          tmp = invhsq * (- lu[(i-1)+j*(lN+2)] - lu[i+(j-1)*(lN+2)]
+                             + 4*lu[i+j*(lN+2)]
+                             - lu[(i+1)+j*(lN+2)] - lu[i+(j+1)*(lN+2)] )
+                             - 1;
+          lres += tmp * tmp;
+      }
   }
-  /* use allreduce for convenience; a reduce would also be sufficient */
   MPI_Allreduce(&lres, &gres, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   return sqrt(gres);
 }
 
 int main(int argc, char * argv[])
 {
-  int mpirank, i, p, N, lN, N_l iter, max_iters;
+  int mpirank, i, p, N, lN, N_l, iter, max_iters;
   MPI_Status status, status1;
 
   MPI_Init(&argc, &argv);
@@ -88,32 +94,42 @@ int main(int argc, char * argv[])
     }
 
     /* communicate ghost values */
-    if (mpirank < p - j2) // Update top row. 
+    if (mpirank < p - j2) 
     {
       /* If not the top processes, send/recv bdry values upward */
-      MPI_Send(&(lunew[(lN+2)*lN+1]), lN, 
+      MPI_Send(&(lunew[(lN+2)*lN]), lN+2, 
                MPI_DOUBLE, mpirank+j2, 124, MPI_COMM_WORLD);
-      MPI_Recv(&(lunew[(lN+2)*(lN+1)+1]), lN, 
+      MPI_Recv(&(lunew[(lN+2)*(lN+1)]), lN+2, 
                MPI_DOUBLE, mpirank+j2, 123, MPI_COMM_WORLD, &status);
     }
-    if (mpirank > 0) 
+    if (mpirank >= j2) 
     {
       /* If not the bottom processes, send/recv bdry values downward */
-      MPI_Send(&(lunew[(lN+2)+1]), lN, 
-               MPI_DOUBLE, mpirank-1, 123, MPI_COMM_WORLD);
-      MPI_Recv(&(lunew[1]), lN, MPI_DOUBLE, mpirank-1, 124, MPI_COMM_WORLD, &status1);
+      MPI_Send(&(lunew[lN+2]), lN+2, 
+               MPI_DOUBLE, mpirank-j2, 123, MPI_COMM_WORLD);
+      MPI_Recv(&(lunew[0]), lN+2, 
+               MPI_DOUBLE, mpirank-j2, 124, MPI_COMM_WORLD, &status);
     }
-    if (mpirank < p - 1) 
+    double ghstore[lN+2];
+    if (mpirank % j2 != 0) 
     {
-      /* If not the last process, send/recv bdry values to the right */
-      MPI_Send(&(lunew[lN]), 1, MPI_DOUBLE, mpirank+1, 124, MPI_COMM_WORLD);
-      MPI_Recv(&(lunew[lN+1]), 1, MPI_DOUBLE, mpirank+1, 123, MPI_COMM_WORLD, &status);
+      /* If not the left processes, send/recv bdry values leftward */
+      for (int k = 0; k < lN+2 ; k++) { ghstore[k] = lunew[1+k*(lN+2)]; }
+      MPI_Send(&(ghstore[0]), lN+2, 
+               MPI_DOUBLE, mpirank-1, 124, MPI_COMM_WORLD);
+      MPI_Recv(&(ghstore[0]), lN+2, 
+               MPI_DOUBLE, mpirank-1, 123, MPI_COMM_WORLD, &status);
+      for (int k = 0; k < lN+2 ; k++) { lunew[k] = ghstore[k]; } 
     }
-    if (mpirank > 0) 
+    if (mpirank % j2 != j2 - 1) 
     {
-      /* If not the first process, send/recv bdry values to the left */
-      MPI_Send(&(lunew[1]), 1, MPI_DOUBLE, mpirank-1, 123, MPI_COMM_WORLD);
-      MPI_Recv(&(lunew[0]), 1, MPI_DOUBLE, mpirank-1, 124, MPI_COMM_WORLD, &status1);
+      /* If not the right processes, send/recv bdry values rightward */
+      for (int k = 0; k < lN+2 ; k++) { ghstore[k] = lunew[lN+k*(lN+2)]; }
+      MPI_Send(&(ghstore[0]), lN+2, 
+               MPI_DOUBLE, mpirank+1, 123, MPI_COMM_WORLD);
+      MPI_Recv(&(ghstore[0]), lN+2, 
+               MPI_DOUBLE, mpirank+1, 124, MPI_COMM_WORLD, &status);
+      for (int k = 0; k < lN+2 ; k++) { lunew[(lN+1)+k*(lN+2)] = ghstore[k]; } 
     }
 
     /* copy newu to u using pointer flipping */
