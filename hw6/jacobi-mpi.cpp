@@ -81,7 +81,6 @@ int main(int argc, char * argv[])
 
   for (iter = 0; iter < max_iters && gres/gres0 > tol; iter++) 
   {
-    printf("%d\n", iter);
     /* Jacobi step for local points */
     for (j = 1; j <= lN; j++)
     {
@@ -106,21 +105,24 @@ int main(int argc, char * argv[])
     if (mpirank >= j2) 
     {
       /* If not the bottom processes, send/recv bdry values downward */
-      MPI_Send(&(lunew[lN+2]), lN+2, 
-               MPI_DOUBLE, mpirank-j2, 123, MPI_COMM_WORLD);
       MPI_Recv(&(lunew[0]), lN+2, 
                MPI_DOUBLE, mpirank-j2, 124, MPI_COMM_WORLD, &status);
+      MPI_Send(&(lunew[lN+2]), lN+2, 
+               MPI_DOUBLE, mpirank-j2, 123, MPI_COMM_WORLD);
     }
     double ghstore[lN+2];
     if (mpirank % j2 != 0) 
     {
       /* If not the left processes, send/recv bdry values leftward */
-      for (int k = 0; k < lN+2 ; k++) { ghstore[k] = lunew[1+k*(lN+2)]; }
-      MPI_Send(&(ghstore[0]), lN+2, 
-               MPI_DOUBLE, mpirank-1, 124, MPI_COMM_WORLD);
       MPI_Recv(&(ghstore[0]), lN+2, 
                MPI_DOUBLE, mpirank-1, 123, MPI_COMM_WORLD, &status);
-      for (int k = 0; k < lN+2 ; k++) { lunew[k*(lN+1)] = ghstore[k]; } 
+      for (int k = 0; k < lN+2 ; k++) 
+      { 
+        lunew[k*(lN+1)] = ghstore[k]; 
+        ghstore[k] = lunew[1+k*(lN+2)];
+      } 
+      MPI_Send(&(ghstore[0]), lN+2, 
+               MPI_DOUBLE, mpirank-1, 124, MPI_COMM_WORLD);
     }
     if (mpirank % j2 != j2 - 1) 
     {
