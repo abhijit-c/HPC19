@@ -37,7 +37,7 @@ double compute_residual(double *lu, int lN, double invhsq){
 
 int main(int argc, char * argv[])
 {
-  int mpirank, i, p, N, lN, N_l, iter, max_iters;
+  int mpirank, i, j, p, N, lN, N_l, iter, max_iters;
   MPI_Status status, status1;
 
   MPI_Init(&argc, &argv);
@@ -72,7 +72,7 @@ int main(int argc, char * argv[])
 
   double h = 1.0 / ( (N + 1)*(N + 1) );
   double hsq = h * h;
-  double invhsq = 1./hsq;
+  double invhsq = 1.0/hsq;
   double gres, gres0, tol = 1e-5;
 
   /* initial residual */
@@ -83,13 +83,14 @@ int main(int argc, char * argv[])
   {
 
     /* Jacobi step for local points */
-    for (int j = 1; j <= lN; j++)
+    for (j = 1; j <= lN; j++)
     {
       for (i = 1; i <= lN; i++)
       {
-        lunew[i+j*(N+2)] = 0.25*(hsq + 
-                                lunew[(i-1)+j*(N+2)] + lunew[i+(j-1)*(N+2)] + 
-                                lunew[(i+1)+j*(N+2)] + lunew[i+(j+1)*(N+2)]); 
+        lunew[i+j*(lN+2)] = 
+          0.25*(hsq + 
+            lunew[(i-1)+j*(lN+2)] + lunew[i+(j-1)*(lN+2)] + 
+            lunew[(i+1)+j*(lN+2)] + lunew[i+(j+1)*(lN+2)] ); 
       }
     }
 
@@ -119,7 +120,7 @@ int main(int argc, char * argv[])
                MPI_DOUBLE, mpirank-1, 124, MPI_COMM_WORLD);
       MPI_Recv(&(ghstore[0]), lN+2, 
                MPI_DOUBLE, mpirank-1, 123, MPI_COMM_WORLD, &status);
-      for (int k = 0; k < lN+2 ; k++) { lunew[k] = ghstore[k]; } 
+      for (int k = 0; k < lN+2 ; k++) { lunew[k*(lN+1)] = ghstore[k]; } 
     }
     if (mpirank % j2 != j2 - 1) 
     {
