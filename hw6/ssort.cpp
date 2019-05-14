@@ -14,10 +14,12 @@ int main( int argc, char *argv[]) {
   MPI_Comm_size(MPI_COMM_WORLD, &p);
 
   /* get name of host running MPI process */
+  /*
   char processor_name[MPI_MAX_PROCESSOR_NAME];
   int name_len;
   MPI_Get_processor_name(processor_name, &name_len);
   printf("Rank %d/%d running on %s.\n", rank, p, processor_name);
+  */
 
   // Number of random numbers per processor 
   int N;
@@ -27,9 +29,9 @@ int main( int argc, char *argv[]) {
 
   int* vec = (int*)malloc(N*sizeof(int));
   int *sdispls = (int *)calloc(sizeof(int), p);
-  int *rdispls = (int *)malloc(p*sizeof(int));
+  int *rdispls = (int *)calloc(sizeof(int), p);
   int *bkt_cnts = (int *)calloc(sizeof(int), p);
-  int *inc_cnts = (int *)malloc(p*sizeof(int));
+  int *inc_cnts = (int *)calloc(sizeof(int), p);
   int *sample = (int *)malloc( (p-1)*sizeof(int) );
 
   // seed random number generator differently on every core
@@ -42,6 +44,7 @@ int main( int argc, char *argv[]) {
     vec[i] = rand();
   }
 
+  // BEGIN and start timing!
   MPI_Barrier(MPI_COMM_WORLD);
   double tt = MPI_Wtime();
 
@@ -51,27 +54,27 @@ int main( int argc, char *argv[]) {
   // sample p-1 entries from vector as the local splitters, i.e.,
   // every N/P-th entry of the sorted vector
 
-  for (int k = 0; k < p-1; ++k) { sample[k] = vec[(N/p) + p*k]; }
+  for (int k = 0; k < p-1; ++k) 
+  { 
+    sample[k] = vec[(N/p) * (k+1) ]; 
+  }
 
   // every process communicates the selected entries to the root
   // process; use for instance an MPI_Gather
-  int *world_samples = NULL;
-  if (p == 0) 
-  { 
-    world_samples = (int *)malloc(sizeof(int)*(p-1)*p); 
-  }
-  MPI_Gather(&sample, p-1, MPI_INT, 
-             &world_samples, p-1, MPI_INT, 0,
+  int *world_samples = (int *)calloc(sizeof(int),(p-1)*p); 
+  MPI_Gather(&sample[0], p-1, MPI_INT, 
+             &world_samples[0], p-1, MPI_INT, 0,
              MPI_COMM_WORLD);
 
   // root process does a sort and picks (p-1) splitters (from the
   // p(p-1) received elements)
-  if (p == 0) 
+
+  if (rank == 0) 
   { 
     std::sort(world_samples, world_samples + p*(p-1));
     for (int k = 0; k < p-1; ++k) 
     { 
-      sample[k] = vec[(p-1)*(k+1)]; 
+      sample[k] = world_samples[(p-1)*(k+1)]; 
     } 
   } 
 
@@ -81,19 +84,18 @@ int main( int argc, char *argv[]) {
   // send and receive: first use an MPI_Alltoall to share with every
   // process how many integers it should expect, and then use
   // MPI_Alltoallv to exchange the data
-  int count = 0;
+
   for (int k = 1; k < p; ++k)
   {
     sdispls[k] = std::lower_bound(vec, vec+N, sample[k-1])-vec;
-    bkt_cnts[k-1] = sdispls[k] - count;
-    count += sdispls[k];
+    bkt_cnts[k-1] = sdispls[k] - sdispls[k-1];
   }
   bkt_cnts[p-1] = N - sdispls[p-1];
 
   MPI_Alltoall(&bkt_cnts[0], 1, MPI_INT,
                &inc_cnts[0], 1, MPI_INT, MPI_COMM_WORLD);
 
-  count = inc_cnts[0];
+  int count = inc_cnts[0];
   rdispls[0] = 0;
   for (int k = 1; k < p; k++)
   {
